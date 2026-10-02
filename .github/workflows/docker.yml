@@ -41,3 +41,31 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Start the image just published and prove it works: the API answers, and Manim
+  # can render a scene with LaTeX math and text inside the container.
+  smoke-test:
+    needs: image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the published image
+        run: |
+          docker run -d --name la -p 127.0.0.1:8000:8000 -v la-data:/data \
+            ghcr.io/${{ github.repository_owner }}/lecture-animator:latest
+          for i in $(seq 1 60); do curl -sf localhost:8000/api/config && exit 0; sleep 2; done
+          docker logs la; exit 1
+      - name: Create a project through the API
+        run: |
+          curl -sf -X POST localhost:8000/api/projects -H 'Content-Type: application/json' -d '{"name":"ci"}'
+          curl -sf localhost:8000/ | grep -q "Lecture Animator"
+      - name: Render a scene with LaTeX inside the container
+        run: |
+          docker exec -i la sh -c 'cat > /tmp/t.py' <<'PY'
+          from manim import *
+          class T(Scene):
+              def construct(self):
+                  self.play(Write(MathTex(r"G_t = \sum_{t=0}^{\infty} \gamma^t r_t")))
+                  self.play(Write(Text("Lecture Animator")))
+          PY
+          docker exec la sh -c 'cd /tmp && manim -ql --disable_caching t.py T && test -s media/videos/t/480p15/T.mp4'
