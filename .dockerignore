@@ -1,0 +1,15 @@
+# Keep the image small and free of anyone's data or keys.
+.git
+.gitignore
+projects
+data
+venv
+.venv
+__pycache__
+*.pyc
+.env
+.env.*
+frontend/node_modules
+frontend/dist
+.DS_Store
+*.log
